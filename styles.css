@@ -1,0 +1,18 @@
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #f4f4f0;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+canvas {
+  width: min(100vw, 1200px);
+  height: auto;
+  display: block;
+  background: #fafaf8;
+}
