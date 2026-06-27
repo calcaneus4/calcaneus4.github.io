@@ -69,6 +69,7 @@ const settings = {
   maxLeftAirplanes: 3,
   maxLeftBombers: 1,
   maxLeftHelicopters: 1,
+  maxLeftDrones: 5,
   maxLeftCastles: 1,
   maxLeftSoldiers: 12,
   maxRightTanks: 4,
@@ -76,6 +77,7 @@ const settings = {
   maxRightAirplanes: 3,
   maxRightBombers: 1,
   maxRightHelicopters: 1,
+  maxRightDrones: 5,
   maxRightCastles: 1,
   maxRightSoldiers: 12,
   countReduction: 0.5,
@@ -204,6 +206,7 @@ const settings = {
     "C = castle",
     "B = bomber",
     "H = helicopter",
+    "D = drone",
     "A = airplane",
     "T = tank",
     "M = motorcycle",
@@ -227,6 +230,7 @@ const settings = {
   airplaneHp: 2,
   bomberHp: 3,
   helicopterHp: 3,
+  droneHp: 1,
   castleHp: 10,
   soldierHp: 1,
   tankSpeed: 10,
@@ -235,14 +239,18 @@ const settings = {
   airplaneSpeed: 200,
   bomberSpeed: 115,
   helicopterSpeed: 85,
+  droneSpeed: 85,
   airplaneBombSpeed: 70,
   bomberBombSpeed: 55,
   helicopterBombSpeed: 38,
   airplaneBurst: 10,
   bomberBurst: 20,
   helicopterBurst: 8,
+  droneBurst: 2,
   castleBurst: 5,
   helicopterHoverDistance: 28,
+  droneAltitudeRatio: 0.43,
+  droneDiveSpeedMultiplier: 2.35,
   airplaneShotSpeed: 360,
   airplaneShotSpread: 18,
   airplaneFireRange: 320,
@@ -264,6 +272,7 @@ const settings = {
     tank: 20,
     airplane: 25,
     helicopter: 35,
+    drone: 2,
     bomber: 40,
     castle: 50,
   },
@@ -984,6 +993,107 @@ class Helicopter extends Airplane {
   }
 }
 
+class Drone extends Airplane {
+  constructor(x, side, terrain, lane = 0) {
+    super(x, side, terrain, lane);
+    this.speed = settings.droneSpeed;
+    this.size = s(30);
+    this.hp = settings.droneHp;
+    this.fireRate = 0;
+    this.bombBurst = settings.droneBurst;
+    this.targetAltitude = H * settings.droneAltitudeRatio + rand(-s(8), s(8));
+    this.flightY = this.terrain.yAt(this.x) - s(10);
+    this.loopMargin = s(50);
+    this.state = "launch";
+    this.target = null;
+    this.hoverTimer = 0;
+    this.impactTarget = null;
+  }
+
+  move(dt, enemies) {
+    this.impactTarget = null;
+    const ground = enemies.filter((e) => e instanceof Castle || e instanceof Tank || e instanceof Motorcycle || e instanceof Soldier);
+    if (this.target && (this.target.dead || !ground.includes(this.target))) {
+      this.target = null;
+      this.state = "patrol";
+    }
+
+    if (this.state === "launch") {
+      const step = this.speed * dt / Math.sqrt(2);
+      this.x += this.side * step;
+      this.flightY -= step;
+      if (this.flightY <= this.targetAltitude) {
+        this.flightY = this.targetAltitude;
+        this.state = "patrol";
+      }
+      return;
+    }
+
+    if (this.state === "patrol") {
+      if (ground.length) {
+        this.target = ground.reduce((a, b) => Math.abs(a.x - this.x) < Math.abs(b.x - this.x) ? a : b);
+        this.state = "hover";
+      } else {
+        this.x += this.side * this.speed * dt;
+      }
+      return;
+    }
+
+    if (this.state === "hover") {
+      if (!this.target) {
+        this.state = "patrol";
+        return;
+      }
+      const dx = this.target.x - this.x;
+      if (Math.abs(dx) > s(8)) this.x += Math.sign(dx) * Math.min(Math.abs(dx), this.speed * dt);
+      this.flightY += (this.targetAltitude - this.flightY) * Math.min(1, dt * 6);
+      if (Math.abs(dx) <= s(10)) {
+        this.hoverTimer += dt;
+        if (this.hoverTimer >= 0.35) this.state = "dive";
+      } else {
+        this.hoverTimer = 0;
+      }
+      return;
+    }
+
+    if (this.state === "dive") {
+      if (!this.target) {
+        this.state = "patrol";
+        return;
+      }
+      const targetY = this.target.y - this.target.radius() * 0.35;
+      const dx = this.target.x - this.x;
+      const dy = targetY - this.flightY;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const step = this.speed * settings.droneDiveSpeedMultiplier * dt;
+      if (step >= distance || distance <= this.radius() + this.target.radius() * 0.35) {
+        this.x = this.target.x;
+        this.flightY = targetY;
+        this.impactTarget = this.target;
+        return;
+      }
+      this.x += dx / distance * step;
+      this.flightY += dy / distance * step;
+    }
+  }
+
+  draw() {
+    const c = teamColor(this.side);
+    const y = this.y;
+    const wobble = Math.sin(performance.now() * 0.02 + this.wobble) * s(2);
+    ctx.strokeStyle = c;
+    ctx.lineWidth = sw(2);
+    ctx.beginPath();
+    ctx.ellipse(this.x, y, s(12), s(9), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    circle(this.x + this.side * s(4), y - s(1), s(2), c);
+    const hubY = y - s(15) + wobble;
+    line(this.x - s(13), hubY - s(13), this.x + s(13), hubY + s(13), c);
+    line(this.x - s(13), hubY + s(13), this.x + s(13), hubY - s(13), c);
+    line(this.x, y - s(9), this.x, hubY, c);
+  }
+}
+
 class Egg {
   constructor(x, y, vx, vy, side, burst = 0) {
     Object.assign(this, { x, y, vx, vy, side, burst });
@@ -1141,6 +1251,7 @@ class Game {
     this.addMany(RIGHT, "airplane", this.aircraftCount(settings.maxLeftAirplanes));
     this.addMany(RIGHT, "bomber", this.aircraftCount(settings.maxLeftBombers));
     this.addMany(RIGHT, "helicopter", this.aircraftCount(settings.maxLeftHelicopters));
+    this.addMany(RIGHT, "drone", this.count(settings.maxLeftDrones));
     this.addMany(RIGHT, "castle", this.count(settings.maxLeftCastles));
     this.addMany(RIGHT, "soldier", this.count(settings.maxLeftSoldiers));
     this.addMany(LEFT, "tank", this.count(settings.maxRightTanks));
@@ -1148,6 +1259,7 @@ class Game {
     this.addMany(LEFT, "airplane", this.aircraftCount(settings.maxRightAirplanes));
     this.addMany(LEFT, "bomber", this.aircraftCount(settings.maxRightBombers));
     this.addMany(LEFT, "helicopter", this.aircraftCount(settings.maxRightHelicopters));
+    this.addMany(LEFT, "drone", this.count(settings.maxRightDrones));
     this.addMany(LEFT, "castle", this.count(settings.maxRightCastles));
     this.addMany(LEFT, "soldier", this.count(settings.maxRightSoldiers));
     this.addUnlockedPlayerUnits();
@@ -1265,6 +1377,7 @@ class Game {
       if (type === "airplane") this.units.push(new Airplane(-s(70) - n * s(125), side, this.terrain, n));
       if (type === "bomber") this.units.push(new Bomber(-s(150) - n * s(145), side, this.terrain, n));
       if (type === "helicopter") this.units.push(new Helicopter(s(120) - n * s(95), side, this.terrain, n));
+      if (type === "drone") this.units.push(new Drone(s(72) - n * s(18), side, this.terrain, n));
       if (type === "castle") this.units.push(new Castle(s(86) - n * s(76), side, this.terrain));
       if (type === "soldier") this.units.push(new Soldier(s(140) - n * s(18), side, this.terrain));
     } else {
@@ -1273,6 +1386,7 @@ class Game {
       if (type === "airplane") this.units.push(new Airplane(W + s(70) + n * s(125), side, this.terrain, n));
       if (type === "bomber") this.units.push(new Bomber(W + s(150) + n * s(145), side, this.terrain, n));
       if (type === "helicopter") this.units.push(new Helicopter(W - s(120) + n * s(95), side, this.terrain, n));
+      if (type === "drone") this.units.push(new Drone(W - s(72) + n * s(18), side, this.terrain, n));
       if (type === "castle") this.units.push(new Castle(W - s(86) + n * s(76), side, this.terrain));
       if (type === "soldier") this.units.push(new Soldier(W - s(140) + n * s(18), side, this.terrain));
     }
@@ -1308,6 +1422,11 @@ class Game {
       const enemies = u.side === RIGHT ? red : blue;
       if (this.canSpeak(u)) u.updateSpeech(dt);
       u.move(dt, enemies);
+      if (u instanceof Drone && u.impactTarget) {
+        this.detonateDrone(u, u.impactTarget);
+        continue;
+      }
+      if (u instanceof Drone) continue;
       if (u.ready(dt)) this.fire(u, enemies);
     }
 
@@ -1341,6 +1460,31 @@ class Game {
     this.units = this.units.filter((u) => !u.dead);
   }
 
+  detonateDrone(drone, target) {
+    if (drone.dead || target.dead) return;
+    target.takeHit();
+    this.maybeSay(target, settings.speechHitComments, 1.05);
+    this.playUnitHit(target);
+    if (target.dead) {
+      this.playUnitDestroyed(target);
+      this.addWreckage(target);
+    }
+    drone.dead = true;
+    this.playUnitDestroyed(drone);
+    this.addWreckage(drone);
+    for (let i = 0; i < drone.bombBurst; i++) {
+      const angle = (145 - i * 70) * Math.PI / 180;
+      const speed = rand(105, 145);
+      this.eggs.push(new Egg(
+        drone.x,
+        drone.y,
+        Math.cos(angle) * speed,
+        -Math.abs(Math.sin(angle) * speed) - rand(10, 45),
+        drone.side,
+      ));
+    }
+  }
+
   addWreckage(unit) {
     if (!settings.showWreckage) return;
     if (unit instanceof Airplane) {
@@ -1357,7 +1501,7 @@ class Game {
   }
 
   addAircraftDebris(unit) {
-    const count = unit instanceof Bomber ? 7 : 5;
+    const count = unit instanceof Drone ? 3 : unit instanceof Bomber ? 7 : 5;
     const baseSpeed = unit.speed * unit.direction();
     for (let i = 0; i < count; i++) {
       this.wreckage.push({
@@ -1646,7 +1790,7 @@ class Game {
   drawTeamTally(label, side, x, y, buttons) {
     const rows = [
       [["C", "castle"], ["B", "bomber"], ["H", "helicopter"], ["A", "airplane"]],
-      [["T", "tank"], ["M", "motorcycle"], ["S", "soldier"]],
+      [["T", "tank"], ["M", "motorcycle"], ["D", "drone"], ["S", "soldier"]],
     ];
     drawText(label, x, y);
     const labelWidth = ctx.measureText(label + "  ").width;
@@ -1678,7 +1822,7 @@ class Game {
     ctx.font = "bold 22px Courier New";
     const rows = [
       [["C", "castle"], ["B", "bomber"], ["H", "helicopter"], ["A", "airplane"]],
-      [["T", "tank"], ["M", "motorcycle"], ["S", "soldier"]],
+      [["T", "tank"], ["M", "motorcycle"], ["D", "drone"], ["S", "soldier"]],
     ];
     const rowWidth = (types) => types.reduce((width, [letter, type]) => {
       if (!buttons) return width + ctx.measureText(`${letter}:00 `).width + 14;
@@ -1919,6 +2063,7 @@ function centerText(text, y) {
 
 function unitType(u) {
   if (u instanceof Castle) return "castle";
+  if (u instanceof Drone) return "drone";
   if (u instanceof Helicopter) return "helicopter";
   if (u instanceof Bomber) return "bomber";
   if (u instanceof Airplane) return "airplane";
