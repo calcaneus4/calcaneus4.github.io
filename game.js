@@ -1089,6 +1089,7 @@ class Game {
     this.lastGoldBonus = 0;
     this.noticeBubble = null;
     this.selectedGameplayHint = "";
+    this.titleTimer = 2;
     this.winner = null;
     this.endGameTitle = "";
     this.clouds = [
@@ -1281,6 +1282,7 @@ class Game {
       if (c.x - 100 * c.scale > W) c.x = -100 * c.scale;
     });
     this.updateWreckage(dt);
+    this.titleTimer = Math.max(0, this.titleTimer - dt);
     if (this.noticeBubble) this.noticeBubble.timer = Math.max(0, this.noticeBubble.timer - dt);
     this.units.forEach((u) => {
       if (u.labelTimer !== undefined) u.labelTimer = Math.max(0, u.labelTimer - dt);
@@ -1555,8 +1557,19 @@ class Game {
     this.drawProgressHud();
     this.drawTally();
     this.drawNoticeBubble();
+    this.drawStartTitle();
     if (this.winner) this.drawEnd();
     drawScreenBorder();
+  }
+
+  drawStartTitle() {
+    if (this.titleTimer <= 0 || this.winner) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, this.titleTimer / 0.8);
+    ctx.fillStyle = LINE;
+    ctx.font = "bold 54px Courier New";
+    centerText("EGG WARS", H / 2);
+    ctx.restore();
   }
 
   drawNoticeBubble() {
