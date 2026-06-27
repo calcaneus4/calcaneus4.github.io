@@ -248,6 +248,7 @@ const settings = {
   airplaneFireRange: 320,
   roundMinSeconds: 30,
   roundMaxSeconds: 45,
+  roundSecondsPerStage: 2,
   powerUpCooldown: 5,
   powerUpBurst: 8,
   goldWinBase: 25,
@@ -1111,7 +1112,8 @@ class Game {
   }
 
   nextRoundLimit() {
-    return rand(settings.roundMinSeconds, settings.roundMaxSeconds);
+    const stageBonus = Math.max(0, this.stage) * settings.roundSecondsPerStage;
+    return rand(settings.roundMinSeconds + stageBonus, settings.roundMaxSeconds + stageBonus);
   }
 
   startStage() {
@@ -1420,12 +1422,15 @@ class Game {
       if (enemyAir.length && enemyGroundGone) return this.shootAir(u, enemyAir);
       return this.dropBomb(u, enemies);
     }
-    const target = enemies.reduce((a, b) => Math.abs(a.x - u.x) < Math.abs(b.x - u.x) ? a : b);
+    const targets = this.targetsInRangeFor(u, enemies);
+    if (!targets.length) {
+      u.fireClock = 0.08;
+      return;
+    }
+    const target = targets.reduce((a, b) => Math.abs(a.x - u.x) < Math.abs(b.x - u.x) ? a : b);
     const [sx, sy] = u.muzzle();
-    let tx = target.x + rand(-16, 16);
+    const tx = target.x + rand(-16, 16);
     const ty = target.y - target.size * 0.55 + rand(-12, 10);
-    const rangeMultiplier = this.projectileRangeMultiplierFor(u);
-    if (rangeMultiplier < 1) tx = u.x + (tx - u.x) * rangeMultiplier;
     const t = clamp(Math.abs(tx - sx) / rand(215, 275), 0.85, 2.6);
     const vx = (tx - sx) / t;
     const vy = (ty - sy - 0.5 * GRAVITY * t * t) / t;
@@ -1439,6 +1444,13 @@ class Game {
     if (u instanceof Motorcycle) return settings.motorcycleProjectileRangeMultiplier;
     if (u instanceof Soldier) return settings.soldierProjectileRangeMultiplier;
     return 1;
+  }
+
+  targetsInRangeFor(u, enemies) {
+    const rangeMultiplier = this.projectileRangeMultiplierFor(u);
+    if (rangeMultiplier >= 1) return enemies;
+    const maxRange = W * rangeMultiplier;
+    return enemies.filter((enemy) => Math.abs(enemy.x - u.x) <= maxRange);
   }
 
   dropHelicopterBomb(u, enemies) {
