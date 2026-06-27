@@ -1761,7 +1761,7 @@ class Game {
     ctx.fillStyle = LINE;
     const timeLeft = Math.max(0, Math.ceil(this.roundLimit - this.roundTime));
     const scoreText = settings.showScore ? `   SCORE ${this.points}` : "";
-    centerText(`STAGE ${this.stage}   GOLD ${this.gold}${scoreText}   TIME ${timeLeft}`, 104);
+    centerText(`STAGE ${this.stage}   GOLD $ ${this.gold}${scoreText}   TIME ${timeLeft}`, 104);
     ctx.font = "bold 18px Courier New";
     const power = this.powerUpCooldown <= 0 ? "YOLK DROP READY" : `YOLK DROP ${this.powerUpCooldown.toFixed(1)}s`;
     centerText(`Tap battlefield: ${power}`, H - 22);
@@ -1790,7 +1790,7 @@ class Game {
   drawTeamTally(label, side, x, y, buttons) {
     const rows = [
       [["C", "castle"], ["B", "bomber"], ["H", "helicopter"], ["A", "airplane"]],
-      [["T", "tank"], ["M", "motorcycle"], ["D", "drone"], ["S", "soldier"]],
+      [["T", "tank"], ["M", "motorcycle"], ["S", "soldier"], ["D", "drone"]],
     ];
     drawText(label, x, y);
     const labelWidth = ctx.measureText(label + "  ").width;
@@ -1822,7 +1822,7 @@ class Game {
     ctx.font = "bold 22px Courier New";
     const rows = [
       [["C", "castle"], ["B", "bomber"], ["H", "helicopter"], ["A", "airplane"]],
-      [["T", "tank"], ["M", "motorcycle"], ["D", "drone"], ["S", "soldier"]],
+      [["T", "tank"], ["M", "motorcycle"], ["S", "soldier"], ["D", "drone"]],
     ];
     const rowWidth = (types) => types.reduce((width, [letter, type]) => {
       if (!buttons) return width + ctx.measureText(`${letter}:00 `).width + 14;
@@ -1845,13 +1845,17 @@ class Game {
     const rewardText = this.lastGoldReward ? `   REWARD +${this.lastGoldReward}${bonusText}` : "";
     const scoreText = settings.showScore ? `   SCORE ${this.points}` : "";
     const shownStage = this.resultMode === "won" ? this.stage - 1 : this.stage;
-    centerText(`STAGE ${shownStage}   GOLD ${this.gold}${scoreText}${rewardText}`, H / 2 + 32);
+    centerText(`STAGE ${shownStage}   GOLD $ ${this.gold}${scoreText}${rewardText}`, H / 2 + 32);
     centerText(`TOTAL WINS  BLUE ${this.score.blue}   RED ${this.score.red}`, H / 2 + 64);
     if (this.resultMode === "won" && this.lastUnlock) centerText(`NEW UNIT: ${this.lastUnlock}`, H / 2 + 96);
     const prompt = this.resultMode === "lost" ? "Click to Try Again" : "Click for Next Stage";
     centerText(prompt, H / 2 + (this.resultMode === "won" && this.lastUnlock ? 130 : 96));
     this.drawEndTextPanel("Unit Keys", settings.unitLegend, 52, 206, 300);
     this.drawEndTextPanel("Battle Tip", [this.selectedGameplayHint], W - 345, 206, 285);
+    ctx.font = "bold 14px Courier New";
+    ctx.fillStyle = LINE;
+    const credit = "EGG WARS © copyright 2026. Created by Michael K. Davis, MD.";
+    ctx.fillText(credit, W - ctx.measureText(credit).width - 18, H - 18);
   }
 
   drawEndTextPanel(title, lines, x, y, maxWidth = 300) {
