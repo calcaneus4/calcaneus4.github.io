@@ -1783,10 +1783,12 @@ class Game {
     if (button.side !== RIGHT) return;
     const cost = settings.unitSpawnCosts[button.type] || 0;
     if (this.gold < cost) {
+      const bubbleX = Number.isFinite(button.x) ? button.x + button.w / 2 : 120;
+      const bubbleY = Number.isFinite(button.y) ? button.y + button.h + 8 : 72;
       this.noticeBubble = {
         text: "Not enough gold.",
-        x: button.x + button.w / 2,
-        y: button.y + button.h + 8,
+        x: bubbleX,
+        y: bubbleY,
         timer: 1.25,
       };
       return;
@@ -1982,7 +1984,7 @@ canvas.addEventListener("pointerdown", (event) => {
   }
   event.preventDefault();
   canvas.setPointerCapture(event.pointerId);
-  holdAdd.button = { side: button.side, type: button.type };
+  holdAdd.button = { ...button };
   addHeldButton();
   holdAdd.delayTimer = setTimeout(() => {
     addHeldButton();
