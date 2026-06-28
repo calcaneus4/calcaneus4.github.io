@@ -262,6 +262,7 @@ const settings = {
   goldWinBase: 25,
   goldPerStage: 2,
   fullDestructionGoldBonus: 20,
+  goldLossConsolation: 10,
   showScore: false,
   scoreWinBase: 0,
   enemyHpScalePerStage: 0.18,
@@ -1360,6 +1361,10 @@ class Game {
       this.stage++;
       this.updateUnlocks();
     } else {
+      if (settings.goldLossConsolation > 0) {
+        this.gold += settings.goldLossConsolation;
+        this.lastGoldReward = settings.goldLossConsolation;
+      }
       this.score.red++;
     }
     audio.play(blueWon ? "end_jingle" : "sad_jingle");
